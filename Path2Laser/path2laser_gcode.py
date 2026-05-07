@@ -220,18 +220,18 @@ class Path2Laser(inkex.EffectExtension):
                 # transform simple path to get all var about orientation
                 self.transform_csp([[[[0, 0], [0, 0], [0, 0]], [[0, 0], [0, 0], [0, 0]]]], layer)
 
-                #je fait un commentaire spécifique a bCNC pour chaque calque/groupe 
+                #je fait un commentaire spécifique a bCNC pour chaque calque/groupe je ne prend que ceux qui on un label, donc définie par l'utilisateur
                 curves = []
                 if  layer.groupmode == "layer":
-                    if layer.label != None:
-                        comment_layer= "\n(Block-name:" + layer.label +")\n"  #pour chaque calque qui font partie des ensemble de chemin
+                    if layer.label != None: # je suis sur un calque
+                        comment_layer= "\n(Block-name:" + layer.label +")\n"  #je prend le label si il existe
                     else:
-                        comment_layer= "\n(Block-name:" + layer.get("id") +")\n"
+                        comment_layer= "\n(Block-name:" + layer.get("id") +")\n" # sinon l'id pour les calque
                 else:
                     if layer.label != None:
-                        comment_layer= "\n((Group: " + layer.label +"))\n"  #pour chaque calque qui font partie des ensemble de chemin
+                        comment_layer= "\n(Block-name:" + layer.label +")\n"  #pour un groupe si il a un label utilisateur je le prend comme un block
                     else:
-                        comment_layer= "\n((Group: " + layer.get("id") +"))\n"
+                        comment_layer= "\n((Group: " + layer.get("id") +"))\n" # sinon je fait un simple commentaire
                     
                 for path in paths[layer]:
                     if "d" not in path.keys():
@@ -432,7 +432,7 @@ class Path2Laser(inkex.EffectExtension):
                     """
         s = str(s)
         #version simplifier sans le log, si c'est pas une erreur on met juste un message d'info, sinon j'interompt le process
-        if type_.lower() in re.split("[\s\n,\.]+", errors.lower()) :
+        if type_.lower() in re.split("[\n]+", errors.lower()) :
             inkex.errormsg(s+"\n")        
             sys.exit()
         else :
