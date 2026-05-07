@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+    <_name>Gabarit</_name>
+    <id>math.fonddugarage.pointsellier.gabarit</id>
+    <param name="tab" type="notebook">
+        <page name="Réglages" _gui-text="Réglages">
+            <param name="unit" type="optiongroup" appearance="combo"  gui-text="Units:">
+                <option value="mm">mm</option>
+                <option value="in">inch</option>
+                <option value="px">pixel</option>
+            </param>
+            <param name="dotsize" type="float" min="0.10" max="1000" gui-text="diametre-décallage du gabarit">3</param>
+            <param name="stylegab" type="optiongroup" appearance="radio" gui-text="Style de gabarit:">
+              <option value="Cercle">Cercle</option>
+              <option value="Carrer">Carrer</option>
+              <option value="Interieur">Décallage in</option>
+              <option value="Exterieur">Décallage out</option>
+          </param>
+        </page>
+        <page name="Help" _gui-text="Help">
+            <_param name="instructions" type="description" xml:space="preserve">cette extension permet de créer sur les point du contour de la pièces un gabarit de distance pour positionner la coutureVersion 1.2 (tester sur linux NixOs et inkscape 1.3.2)</_param>
+        </page>
+    </param>
+    <effect>
+		<object-type>path</object-type>
+                <effects-menu>
+                    <submenu _name="Creation patron cuir"/>
+                </effects-menu>
+    </effect>
+    <script>
+        <command location="inx" interpreter="python">ps_gabarit.py</command>
+    </script>
+</inkscape-extension>
