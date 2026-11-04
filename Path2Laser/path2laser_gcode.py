@@ -19,7 +19,6 @@
 # where parent may be the layer or a parent group. To get the parent group, you can use
 # parent = self.selected_paths[layer][0].getparent()
 ################################################################################
-import cmath
 import math
 import os
 import re
@@ -28,8 +27,8 @@ import sys
 import numpy
 
 import inkex
-from inkex.bezier import bezierlength, bezierparameterize, beziertatlength
-from inkex import Transform, PathElement, TextElement, Tspan, Group, Layer, CubicSuperPath
+from inkex.bezier import bezierlength, bezierparameterize
+from inkex import Transform, PathElement, TextElement, Tspan, Group, Layer
 
 
 ################################################################################
@@ -39,6 +38,17 @@ from inkex import Transform, PathElement, TextElement, Tspan, Group, Layer, Cubi
 ################################################################################
 
 TAU = math.pi * 2
+
+################################################################################
+# Couleurs reconnues (en dur), modifier ici pour faire évoluer
+# Un chemin est retenu si son canal choisi est >= COLOR_SEUIL et que les 2 autres sont < COLOR_SEUIL
+# Index du canal dans to_rgba() : 0 = rouge, 1 = vert, 2 = bleu
+# Le canal choisi sert aussi à faire varier la vitesse (voir pc_couleur)
+# Les 2 canaux doivent être différents
+################################################################################
+COLOR_CHANNEL_GRAV = 2  # bleu = gravure
+COLOR_CHANNEL_CUT = 0   # rouge = découpe
+COLOR_SEUIL = 100
 STRAIGHT_TOLERANCE = 0.0001 #0.0001 #tolérance pour passer en ligne
 STRAIGHT_DISTANCE_TOLERANCE = 0.0001 #0.0001 
 
@@ -74,13 +84,17 @@ class Path2Laser(inkex.EffectExtension):
         #Gravure
         self.arg_parser.add_argument("--grav-laser-speed", type=int,dest="grav_laser_speed", default="750",  help="Laser speed (mm/min)")
         self.arg_parser.add_argument("--grav-laser-power",  type=int,dest="grav_laser_power",  default="255",   help="S# is 256 or 10000 for full power")
-        self.arg_parser.add_argument("--grav-Z",  type=int,dest="grav_Z",  default="0", help="Hauteur du Z")
+        # >>> CORRECTION 6 : Z en float (avant : type=int)
+        self.arg_parser.add_argument("--grav-Z",  type=float,dest="grav_Z",  default="0", help="Hauteur du Z")
+        # <<< FIN CORRECTION 6
         self.arg_parser.add_argument("--grav-color",  dest="grav_color",  default="0x000000ff",   help="Color for engraving")
 
         #Decoupe
         self.arg_parser.add_argument("--cut-laser-speed", type=int,dest="cut_laser_speed", default="750",  help="Laser speed (mm/min)")
         self.arg_parser.add_argument("--cut-laser-power",  type=int,dest="cut_laser_power",  default="255",   help="S# is 256 or 10000 for full power")
-        self.arg_parser.add_argument("--cut-Z",  type=int,dest="cut_Z",  default="0", help="Hauteur du Z")
+        # >>> CORRECTION 6 : Z en float (avant : type=int)
+        self.arg_parser.add_argument("--cut-Z",  type=float,dest="cut_Z",  default="0", help="Hauteur du Z")
+        # <<< FIN CORRECTION 6
         self.arg_parser.add_argument("--cut-passes",  type=int,dest="cut_passes",  default="3", help="Quantity of passes")
         self.arg_parser.add_argument("--cut-pass-depth", type=float ,dest="cut_pass_depth", default="0.5",  help="Depth of laser cut")
         self.arg_parser.add_argument("--cut-color",  dest="cut_color",  default="0xff0000ff",   help="Color for cuting")
@@ -155,8 +169,6 @@ class Path2Laser(inkex.EffectExtension):
     def Preparation(self):
         #"Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
         self.get_info()
-        self.cut_rgb=self.options.cut_color# [self.options.cut_red,self.options.cut_green,self.options.cut_blue]
-        self.grav_rgb=self.options.grav_color #[self.options.grav_red,self.options.grav_green,self.options.grav_blue]
     
         if self.orientation_points == {}:
             self.orientation(self.layers[min(0,len(self.layers)-1)] )
@@ -208,6 +220,10 @@ class Path2Laser(inkex.EffectExtension):
         gcode = ""
         comment="()"
         
+        # >>> CORRECTION 5 : suppression des anciens aperçus avant d'en créer un nouveau (avant : un groupe de plus à chaque exécution)
+        for old_preview in self.svg.xpath('//svg:g[@{}="Preview groups"]'.format(self.Zone_name['Definition'])):
+            old_preview.getparent().remove(old_preview)
+        # <<< FIN CORRECTION 5
         attr = {self.Zone_name['Definition']: "Preview groups"}
         PreviewGroups = self.svg.add(Group(**attr))
         PreviewGroups.label="Preview groups"
@@ -264,12 +280,14 @@ class Path2Laser(inkex.EffectExtension):
 
 
 
-                    if couleur[2] >99 and couleur[0] <100 and couleur[1] < 100 :  # si j'ai un bleu plus grand  que 100 je considère que je grav
+                    if canal_pur(couleur, COLOR_CHANNEL_GRAV):  # canal de gravure seul au dessus du seuil, je grave
                         self.tools = {
                         "name": "Laser Engraver",
                         "id": "Laser Engraver",
                         "penetration feed": int(self.options.grav_laser_speed),
-                        "feed": round(int(self.options.grav_laser_speed)*self.pc_couleur(couleur[2]),0),
+                        # >>> CORRECTION 7 : feed toujours entier (avant : round(...,0) renvoyait un float -> F750.0)
+                        "feed": int(round(int(self.options.grav_laser_speed)*self.pc_couleur(couleur[COLOR_CHANNEL_GRAV]))),
+                        # <<< FIN CORRECTION 7
                         "gcode before path": self.options.laser_on_command_grav + " S" + str(round(int(self.options.grav_laser_power)*stroke_opacity,2)) + Pause,
                         "gcode after path": self.options.laser_off_command + " S0" + "\n" + "G0 F" + self.options.travel_speed,
                         "Pass_in":1,
@@ -277,12 +295,14 @@ class Path2Laser(inkex.EffectExtension):
                         "Z_start": self.options.grav_Z,
                         }
                         Ok=True
-                    elif couleur[0]>99 and couleur[2] <100 and couleur[1] <100: #sinon je regarde pour le rouge idem plus grand que 100
+                    elif canal_pur(couleur, COLOR_CHANNEL_CUT): #sinon je regarde le canal de découpe, idem
                         self.tools = {
                         "name": "Laser cutter",
                         "id": "Laser cutter",
                         "penetration feed": int(self.options.cut_laser_speed),
-                        "feed": round(int(self.options.cut_laser_speed*self.pc_couleur(couleur[0])),0),
+                        # >>> CORRECTION 7 : feed toujours entier, meme calcul que la gravure (avant : int() puis round())
+                        "feed": int(round(int(self.options.cut_laser_speed)*self.pc_couleur(couleur[COLOR_CHANNEL_CUT]))),
+                        # <<< FIN CORRECTION 7
                         "gcode before path":  self.options.laser_on_command_cut + " S" + str(round(int(self.options.cut_laser_power)*stroke_opacity,2)) + Pause ,
                         "gcode after path": self.options.laser_off_command + " S0" + "\n" + "G0 F" + self.options.travel_speed ,
                         "Pass_in":self.options.cut_passes,
@@ -330,14 +350,11 @@ class Path2Laser(inkex.EffectExtension):
 #
 ################################################################################
     def pc_couleur(self,couleur):
-        pccouleur=0 # __init__
-        if couleur> 200:
-            pccouleur=1
-        if couleur < 105:
-            pccouleur=.1 # mini a 10% de la vitesse pour éviter que cela ne bouge plus
-        if couleur >104 and couleur < 201:
-            pccouleur=(couleur-100)/100
-        return pccouleur
+        # >>> CORRECTION 3 : courbe monotone, mini 10% (avant : 105 donnait 5%, 108 donnait 8%, puis 110 redonnait 10%)
+        if couleur > 200:
+            return 1
+        return max(.1, (couleur-100)/100) # mini a 10% de la vitesse pour éviter que cela ne bouge plus
+        # <<< FIN CORRECTION 3
 
 ################################################################################
 #
@@ -365,18 +382,10 @@ class Path2Laser(inkex.EffectExtension):
                     r += s[i] + ("{:f}".format(c[i] * m[i] + a[i])) + s1[i]
             return r
 
-        def calculate_angle(a, current_a):
-            return min(
-                    [abs(a - current_a % TAU + TAU), a + current_a - current_a % TAU + TAU],
-                    [abs(a - current_a % TAU - TAU), a + current_a - current_a % TAU - TAU],
-                    [abs(a - current_a % TAU), a + current_a - current_a % TAU])[1]
-
         if len(curve) == 0:
             return ""
 
-
         lg = 'G00'
-        #TODO a supprimer
         f = " F{}".format(tool['feed'])
         for i in range(1, len(curve)):
             #    Creating Gcode for curve between s=curve[i-1] and si=curve[i] start at s[0] end at s[4]=si[0]
@@ -390,14 +399,10 @@ class Path2Laser(inkex.EffectExtension):
                 g += tool['gcode after path'] + "\n"
                 lg = 'G00'
             elif s[1] == 'line':
-                # if lg == "G00":
-                #     g += "G00" + c([None, None, s[5][0] + depth]) + feed + "(2)\n"
                 g += "G01" + c(si[0] ) + feed + "\n"
                 lg = 'G01'
             elif s[1] == 'arc':
                 r = [(s[2][0] - s[0][0]), (s[2][1] - s[0][1])]
-                # if lg == "G00":
-                    # g += "G00" + c([None, None, s[5][0] + depth]) + feed + "(4)\n"
                 if (r[0] ** 2 + r[1] ** 2) > self.options.min_arc_radius ** 2:
                     r1 = (P(s[0]) - P(s[2]))
                     r2 = (P(si[0]) - P(s[2]))
@@ -478,9 +483,6 @@ class Path2Laser(inkex.EffectExtension):
                             pt[0], pt[1] = Transform(self.reverse_transform(trans)).apply_to_point(pt)
         return csp
 
-#     def transform_scalar(self, x, layer, reverse=False):
-#       return self.transform([x, 0], layer, reverse)[0] - self.transform([0, 0], layer, reverse)[0]
-
     def transform(self, source_point, layer, reverse=False):
         if layer not in self.transform_matrix:
             for i in range(self.layers.index(layer), -1, -1):
@@ -500,8 +502,6 @@ class Path2Laser(inkex.EffectExtension):
                     points += [[[(points[1][0][1] - points[0][0][1]) + points[0][0][0], -(points[1][0][0] - points[0][0][0]) + points[0][0][1]], [-(points[1][1][1] - points[0][1][1]) + points[0][1][0], points[1][1][0] - points[0][1][0] + points[0][1][1]]]]
                 if len(points) == 3:
 
-                    # for point in points:
-                    #    Zcoordinates definition taken from Orientatnion point 1 and 2
                     self.Zcoordinates[layer] = [max(points[0][1][2], points[1][1][2]), min(points[0][1][2], points[1][1][2])]
                     matrix = numpy.array([
                         [points[0][0][0], points[0][0][1], 1, 0, 0, 0, 0, 0, 0],
@@ -530,8 +530,6 @@ class Path2Laser(inkex.EffectExtension):
 
             self.transform_matrix_reverse[layer] = numpy.linalg.inv(self.transform_matrix[layer]).tolist()
 
-
-            # Zautoscale is obsolete
             self.Zauto_scale[layer] = 1
 
         x = source_point[0]
@@ -562,13 +560,11 @@ class Path2Laser(inkex.EffectExtension):
         self.paths = {}
         self.tools = {}
         self.orientation_points = {}
-        self.graffiti_reference_points = {}
         self.layers = [self.document.getroot()]
         self.Zcoordinates = {}
         self.transform_matrix = {}
         self.transform_matrix_reverse = {}
         self.Zauto_scale = {}
-        self.in_out_reference_points = []
         self.DocName=""
               
         def recursive_search(g, layer, selected=False,level=""):
@@ -718,7 +714,7 @@ class Path2Laser(inkex.EffectExtension):
 ###       Export_gcode
 ###
 ###        Main function of Gcodetools class
-###TODO faire les export en 2  ou 1 fichier
+###
 ################################################################################
     def check_dir(self):
         if os.path.isdir(self.options.directory):
@@ -768,18 +764,7 @@ class Path2Laser(inkex.EffectExtension):
             return []
         p = self.transform_csp(p, layer)
 
-        # Sort to reduce Rapid distance
-        k = list(range(1, len(p)))
-        keys = [0]
-        while len(k) > 0:
-            end = p[keys[-1]][-1][1]
-            dist = None
-            for i in range(len(k)):
-                start = p[k[i]][0][1]
-                dist = max((-((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2), i), dist)
-            keys += [k[dist[1]]]
-            del k[dist[1]]
-        for k in keys:
+        for k in range(len(p)):
             subpath = p[k]
             c += [[[subpath[0][1][0], subpath[0][1][1]], 'move', 0, 0]]
             for i in range(1, len(subpath)):
@@ -791,7 +776,9 @@ class Path2Laser(inkex.EffectExtension):
        
     def export_gcode(self,gcode):
         #export du gcode un fois finie
-        f = open(self.options.directory+self.options.file, "w")
+        # >>> CORRECTION 1 : os.path.join (avant : directory+file, faux sans "/" final, le fichier partait à côté du dossier)
+        f = open(os.path.join(self.options.directory, self.options.file), "w")
+        # <<< FIN CORRECTION 1
         if self.DocName==None:
             NomDessin="Iconnu"
         else:
@@ -805,19 +792,6 @@ class Path2Laser(inkex.EffectExtension):
 # draw csp
 #
 ################################################################################
-    def draw_csp(self, csp, layer=None, group=None, fill='none', stroke='#178ade', width=0.354, style=None):
-        if layer is not None:
-            csp = self.transform_csp(csp, layer, reverse=True)
-        if group is None and layer is None:
-            group = self.document.getroot()
-        elif group is None and layer is not None:
-            group = layer
-        csp = self.apply_transforms(group, csp, reverse=True)
-        if style is not None:
-            return draw_csp(csp, group=group, style=style)
-        else:
-            return draw_csp(csp, group=group, fill=fill, stroke=stroke, width=width)
-
     def draw_curve(self, curve, layer, groupbase=None, style=MARKER_STYLE["biarc_style"],name=""):
         
         attr={self.Zone_name['Definition']:'Preview group'}
@@ -886,6 +860,20 @@ class Path2Laser(inkex.EffectExtension):
                     elem.style = st
 
             s = si
+
+################################################################################
+#
+# Test de couleur : le canal choisi seul est au dessus du seuil
+# couleur = to_rgba() ; renvoie False pour une couleur mélangée, noire ou sans couleur
+#
+################################################################################
+def canal_pur(couleur, canal):
+    if couleur[canal] < COLOR_SEUIL:
+        return False
+    for i in range(3):
+        if i != canal and couleur[i] >= COLOR_SEUIL:
+            return False
+    return True
 
 ################################################################################
 #
@@ -1131,8 +1119,6 @@ def csp_segments_intersection(sp1, sp2, sp3, sp4):
             intersections[i] = polish_intersection(a, b, intersections[i][0], intersections[i][1])
     return intersections
 
- 
-
 
 def csp_curvature_at_t(sp1, sp2, t, depth=3):
     ax, ay, bx, by, cx, cy, dx, dy = bezierparameterize(csp_segment_to_bez(sp1, sp2))
@@ -1347,10 +1333,6 @@ def bez_split(a, t=0.5):
 ################################################################################
 
 
-def cross(a, b):
-    return a[1] * b[0] - a[0] * b[1]
-
-
 def dot(a, b):
     return a[0] * b[0] + a[1] * b[1]
 
@@ -1360,11 +1342,6 @@ def dot(a, b):
 # Common functions
 ################################################################################
 
-
-
-def small(a):
-    global small_tolerance
-    return abs(a) < small_tolerance
 
 
 def atan2(*arg):
@@ -1398,22 +1375,6 @@ def draw_text(text, x, y, group=None, style=None, font_size=10, gcodetools_tag=N
         y += font_size
         span.text = str(string)
 
-
-
-def draw_csp(csp, stroke="#f00", fill="none", comment="", width=0.354, group=None, style=None):
-    if group is None:
-        group = options.doc_root
-    node = group.add(PathElement())
-
-    node.style = style if style is not None else \
-        {'fill': fill, 'fill-opacity': 1, 'stroke': stroke, 'stroke-width': width}
-
-    node.path = CubicSuperPath(csp)
-
-    if comment != '':
-        node.set('comment', comment)
-
-    return node
 
 
 def straight_segments_intersection(a, b, true_intersection=True):  # (True intersection means check ta and tb are in [0,1])
@@ -1516,9 +1477,4 @@ class P(object):
 if __name__ == '__main__':
     Path2Laser().run()
     
-#a traiter    
-#     actif Decoupe
-# actif Dessin
-# /home/David/.var/app/org.inkscape.Inkscape/config/inkscape/extensions/path2laser_gcode.py:441: DeprecationWarning: inkex.deprecated.main.transform_mul -> Use @ operator instead
-#   trans = (Transform(t) * Transform(trans)).matrix if trans != [] else t
-# actif Gravure
+
