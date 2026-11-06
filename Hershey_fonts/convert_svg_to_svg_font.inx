@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+
+  <name>Export SVG Font</name>
+  <id>org.inkscape.effect.export_svg_font</id>
+
+  <param name="font-name"    type="string"  gui-text="Nom de la fonte">My_HersheyCustom</param>
+  <param name="output-file"  type="path"    gui-text="Dossier de sortie" mode="folder" filetypes="svg">./</param>
+  <param name="units-per-em" type="int"     gui-text="Units per em" min="100" max="4096">1000</param>
+  <param name="ascent"       type="int"     gui-text="Ascent"       min="0"   max="4096">800</param>
+  <param name="horiz-adv-x" type="int" gui-text="Horiz-adv-x (défaut fonte)" min="0" max="4096">500</param>
+  <param name="descent"      type="int"     gui-text="Descent"      min="-4096" max="0">-200</param>
+
+  <effect>
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="Glyphs"/>
+    </effects-menu>
+  </effect>
+
+  <script>
+    <command location="inx" interpreter="python">convert_svg_to_svg_font.py</command>
+  </script>
+
+</inkscape-extension>

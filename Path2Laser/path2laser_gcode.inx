@@ -38,7 +38,27 @@
             </_param>
 
         </page>
+        <page name="Ordre" _gui-text="Ordre">
+            <_param name="order_infos" type="description" xml:space="preserve">
+            Cet onglet réordonne les calques et groupes dans Inkscape, sans créer de GCode.
+            Il suffit de lancer l'extension avec cet onglet affiché.
+
+            Pour le GCode, les calques sont lus du plus en avant plan au plus en arrière plan (le haut de la liste des calques en premier).
+            L'ordre appliqué est :
+            1) les calques/groupes de gravure seule (bleu)
+            2) les calques/groupes de découpe seule (rouge)
+            3) les calques/groupes qui mélangent gravure et découpe, placés en dernier (le plus en arrière plan)
+            </_param>
+            <_param name="order_infos2" type="description" xml:space="preserve">
+            Dans un calque/groupe qui mélange les 2, les chemins sont réordonnés pour faire la gravure puis la découpe.
+            Seuls les calques, groupes et chemins visibles, de couleur reconnue, sont déplacés.
+            Les autres éléments gardent leur place. La hiérarchie des groupes n'est pas modifiée, seul l'ordre entre éléments de même niveau change.
+            Le réordonnancement s'applique à tout le document, même si une sélection est faite.
+            Pour le faire automatiquement avant chaque GCode, cocher la case dans l'onglet Gcode.
+            </_param>
+        </page>
         <page name="GCode" _gui-text="Gcode">
+            <param name="order-before-gcode" type="boolean" _gui-text="Réordonner les calques avant de produire le GCode (voir onglet Ordre)">false</param>
             <_param name="cut_infos" type="description" xml:space="preserve">
             GCODE de début et de fin du GCODE.
             </_param>
@@ -60,7 +80,7 @@
                 <item value="G21 (All units in mm)">mm</item>
                 <item value="G20 (All units in inches)">in</item>
             </param>
-            <_param name="gcode_infos1" type="description" xml:space="preserve">le délai rajoute un ligne de type "G4 Px.x" avant l'allumage du laser.</param>
+            <_param name="gcode_infos1" type="description" xml:space="preserve">le délai rajoute un ligne de type "G4 Px.x" avant l'allumage du laser.</_param>
            	<param name="power-delay" type="float" min="0" max="1000" _gui-text="Délai:(s,ms):">0.0</param>
         </page>
         <page name="Fichier" _gui-text="Fichier">

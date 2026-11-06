@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+
+  <name>Auto Metrics</name>
+  <id>org.inkscape.effect.auto_metrics</id>
+
+  <param name="padding" type="float" gui-text="Padding (unités doc)" min="0" max="10">0.5</param>
+
+  <effect>
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="Glyphs"/>
+    </effects-menu>
+  </effect>
+
+  <script>
+    <command location="inx" interpreter="python">auto_metrics.py</command>
+  </script>
+
+</inkscape-extension>

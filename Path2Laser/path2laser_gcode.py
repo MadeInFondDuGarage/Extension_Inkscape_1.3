@@ -30,6 +30,10 @@ import inkex
 from inkex.bezier import bezierlength, bezierparameterize
 from inkex import Transform, PathElement, TextElement, Tspan, Group, Layer
 
+# >>> EVOLUTION ordonnancement : module séparé, doit être dans le même dossier que ce fichier
+import path2laser_order
+# <<< FIN EVOLUTION ordonnancement
+
 
 ################################################################################
 #
@@ -112,6 +116,9 @@ class Path2Laser(inkex.EffectExtension):
         #Fichier
         self.arg_parser.add_argument("-d","--directory",    dest="directory", default="/home/david/", help="Output directory")
         self.arg_parser.add_argument("-f","--filename",     dest="file", default="output.gcode", help="File name")
+        # >>> EVOLUTION ordonnancement : case à cocher dans l'onglet Gcode
+        self.arg_parser.add_argument("--order-before-gcode", type=inkex.Boolean, dest="order_before_gcode", default=False, help="Reorder layers and paths before the gcode")
+        # <<< FIN EVOLUTION ordonnancement
         self.arg_parser.add_argument("--add-numeric-suffix-to-filename", type=inkex.Boolean, dest="add_numeric_suffix_to_filename", default=False, help="Add numeric suffix to file name")
 
         self.arg_parser.add_argument("--tab", dest="tab",   help="The selected UI-tab when OK was pressed")
@@ -155,6 +162,16 @@ class Path2Laser(inkex.EffectExtension):
 
         self.Zone_name={'Definition':'Path2Laser'}
 
+        # >>> EVOLUTION ordonnancement
+        # sur l'onglet Ordre on ne fait que réordonner, pas de gcode
+        if str(self.options.tab).strip("\"'") == "Ordre":
+            self.Ordonnancement()
+            return
+        # sur les autres onglets, on réordonne avant le gcode si la case est cochée
+        if self.options.order_before_gcode:
+            self.Ordonnancement()
+        # <<< FIN EVOLUTION ordonnancement
+
         #apres la vérification de la préparation, si tout est ok on lance le precessus de creation
         if self.Preparation():
             self.Go_Gcode()
@@ -178,6 +195,15 @@ class Path2Laser(inkex.EffectExtension):
         
     def Go_Gcode(self):
         self.path_to_gcode()
+
+    # >>> EVOLUTION ordonnancement
+    def Ordonnancement(self):
+        stats = path2laser_order.reordonner(self.svg, type_chemin)
+        if stats["groupes"] == 0 and stats["chemins"] == 0:
+            self.error("Ordonnancement : rien à modifier, l'ordre est déjà correct.", "info")
+        else:
+            self.error("Ordonnancement : {} calque(s)/groupe(s) et {} chemin(s) déplacé(s).".format(stats["groupes"], stats["chemins"]), "info")
+    # <<< FIN EVOLUTION ordonnancement
 
 ################################################################################
 #
@@ -329,7 +355,13 @@ class Path2Laser(inkex.EffectExtension):
                         self.draw_curve(subcurve, layer, PreviewGroups,name=curve[0][0])
 
                 #passage en ordonnancement direct
-                keys = sort_curves([curve[1] for curve in curves])
+                # >>> EVOLUTION ordonnancement : dans un même calque/groupe la gravure passe avant la découpe
+                # (le tri par proximité se fait séparément pour chaque outil, résultat inchangé si le calque n'a qu'un seul outil)
+                keys = []
+                for nom_outil in ("Laser Engraver", "Laser cutter"):
+                    indices = [i for i in range(len(curves)) if curves[i][0][1]["name"] == nom_outil]
+                    keys += [indices[k] for k in sort_curves([curves[i][1] for i in indices])]
+                # <<< FIN EVOLUTION ordonnancement
                 for key in keys:
                     #attention ici on est sur un ensemble avec une profondeur de passe
                     path_tool=curves[key][0][1] #je récupère les infos d'outils spécifique a la courbe
@@ -860,6 +892,22 @@ class Path2Laser(inkex.EffectExtension):
                     elem.style = st
 
             s = si
+
+################################################################################
+#
+# Type d'un chemin pour l'ordonnancement : "grav", "cut" ou None
+# None si le chemin est invisible, sans "d" ou de couleur non reconnue (mêmes règles que path_to_gcode)
+#
+################################################################################
+def type_chemin(chemin):
+    if "d" not in chemin.keys() or chemin.style('display') != 'inline':
+        return None
+    couleur = inkex.Color(chemin.style('stroke')).to_rgba()
+    if canal_pur(couleur, COLOR_CHANNEL_GRAV):
+        return "grav"
+    if canal_pur(couleur, COLOR_CHANNEL_CUT):
+        return "cut"
+    return None
 
 ################################################################################
 #
