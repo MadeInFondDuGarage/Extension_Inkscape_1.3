@@ -38,6 +38,23 @@
             </_param>
 
         </page>
+        <page name="Remplissage" _gui-text="Remplissage">
+            <_param name="fill_infos" type="description" xml:space="preserve">
+            Cet onglet remplace le fond des formes par des traits de gravure, sans créer de GCode.
+            Sans sélection, toutes les formes visibles ayant un fond sont remplies. Avec une sélection, seulement les formes sélectionnées (et le contenu des groupes sélectionnés).
+            Seuls les fonds de la couleur de gravure (bleu) sont remplis.
+            </_param>
+            <_param name="fill_infos2" type="description" xml:space="preserve">
+            Le chemin créé est placé juste après la forme, avec la couleur du fond comme couleur de trait (la vitesse suit donc l'intensité de la couleur). Le fond de la forme est enlevé, son contour n'est pas modifié.
+            </_param>
+            <param name="fill-angle" type="float" min="-360" max="360" precision="1" _gui-text="Angle des hachures (degrés, mode hachures)">45</param>
+            <param name="fill-spot" type="float" min="0.005" max="10" precision="3" _gui-text="Taille du point laser (mm)">0.1</param>
+            <param name="fill-spacing" type="float" min="10" max="1000" precision="0" _gui-text="Écartement entre les chemins (% de la taille du point)" _gui-description="100 = les traits se touchent, moins de 100 = ils se chevauchent, plus de 100 = il reste un espace.">100</param>
+            <param name="fill-reduce" type="float" min="0" max="100" precision="0" _gui-text="Réduction de la puissance sur les zones remplies (%)" _gui-description="Réduit l'opacité du trait, donc la puissance dans le GCode. La couleur, donc la vitesse, ne change pas.">0</param>
+            <_param name="fill_infos3" type="description" xml:space="preserve">
+            Hachures : elles vont jusqu'au bord de la forme, en suivant la règle de remplissage de la forme.
+            </_param>
+        </page>
         <page name="Ordre" _gui-text="Ordre">
             <_param name="order_infos" type="description" xml:space="preserve">
             Cet onglet réordonne les calques et groupes dans Inkscape, sans créer de GCode.
@@ -50,10 +67,16 @@
             3) les calques/groupes qui mélangent gravure et découpe, placés en dernier (le plus en arrière plan)
             </_param>
             <_param name="order_infos2" type="description" xml:space="preserve">
-            Dans un calque/groupe qui mélange les 2, les chemins sont réordonnés pour faire la gravure puis la découpe.
-            Seuls les calques, groupes et chemins visibles, de couleur reconnue, sont déplacés.
-            Les autres éléments gardent leur place. La hiérarchie des groupes n'est pas modifiée, seul l'ordre entre éléments de même niveau change.
+            Ensuite, dans chaque calque/groupe, les chemins sont réordonnés pour réduire les déplacements à vide du laser : gravure puis découpe, chacune avec le parcours le plus court.
+            Le premier calque part du point 0 de la machine (coin bas gauche du document), les suivants partent de la fin du précédent.
+            Le sens d'un chemin ouvert est inversé si cela raccourcit le parcours. Les chemins fermés ne sont jamais modifiés. Un chemin avec un effet de chemin est déplacé mais jamais inversé.
+            Le GCode suit ensuite l'ordre du document, sans autre tri.
+            </_param>
+            <_param name="order_infos3" type="description" xml:space="preserve">
+            Seuls les calques, groupes et chemins visibles, de couleur reconnue, sont déplacés. Les autres éléments gardent leur place.
+            La hiérarchie des groupes n'est pas modifiée, seul l'ordre entre éléments de même niveau change.
             Le réordonnancement s'applique à tout le document, même si une sélection est faite.
+            Un message indique le nombre d'éléments déplacés et la distance des déplacements à vide avant et après.
             Pour le faire automatiquement avant chaque GCode, cocher la case dans l'onglet Gcode.
             </_param>
         </page>

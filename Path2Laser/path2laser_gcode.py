@@ -34,6 +34,10 @@ from inkex import Transform, PathElement, TextElement, Tspan, Group, Layer
 import path2laser_order
 # <<< FIN EVOLUTION ordonnancement
 
+# >>> EVOLUTION remplissage : module séparé, doit être dans le même dossier que ce fichier
+import path2laser_fill
+# <<< FIN EVOLUTION remplissage
+
 
 ################################################################################
 #
@@ -103,6 +107,13 @@ class Path2Laser(inkex.EffectExtension):
         self.arg_parser.add_argument("--cut-pass-depth", type=float ,dest="cut_pass_depth", default="0.5",  help="Depth of laser cut")
         self.arg_parser.add_argument("--cut-color",  dest="cut_color",  default="0xff0000ff",   help="Color for cuting")
 
+        # >>> EVOLUTION remplissage : onglet Remplissage
+        self.arg_parser.add_argument("--fill-angle", type=float, dest="fill_angle", default=45.0, help="Angle of the hatches (degrees)")
+        self.arg_parser.add_argument("--fill-spot", type=float, dest="fill_spot", default=0.1, help="Laser spot size (mm)")
+        self.arg_parser.add_argument("--fill-spacing", type=float, dest="fill_spacing", default=100.0, help="Spacing between lines (percent of the spot size)")
+        self.arg_parser.add_argument("--fill-reduce", type=float, dest="fill_reduce", default=0.0, help="Power reduction on filled areas (percent)")
+        # <<< FIN EVOLUTION remplissage
+
         #Gcode
         self.arg_parser.add_argument("--travel-speed",dest="travel_speed", default="3000", help="Travel speed (mm/min)")
         self.arg_parser.add_argument("--Gcode-start", dest="Gcode_start",default="",help="start gcode command")
@@ -163,6 +174,10 @@ class Path2Laser(inkex.EffectExtension):
         self.Zone_name={'Definition':'Path2Laser'}
 
         # >>> EVOLUTION ordonnancement
+        # sur l'onglet Remplissage on ne fait que remplir, pas de gcode
+        if str(self.options.tab).strip("\"'") == "Remplissage":
+            self.Remplissage()
+            return
         # sur l'onglet Ordre on ne fait que réordonner, pas de gcode
         if str(self.options.tab).strip("\"'") == "Ordre":
             self.Ordonnancement()
@@ -198,12 +213,34 @@ class Path2Laser(inkex.EffectExtension):
 
     # >>> EVOLUTION ordonnancement
     def Ordonnancement(self):
-        stats = path2laser_order.reordonner(self.svg, type_chemin)
-        if stats["groupes"] == 0 and stats["chemins"] == 0:
+        # le départ de la machine est le point 0 des points d'orientation : coin bas gauche du document (voir orientation())
+        hauteur = self.svg.unittouu(self.document.getroot().get('height'))
+        if self.document.getroot().get('height') == "100%":
+            hauteur = 1052.3622047
+        stats = path2laser_order.reordonner(self.svg, type_chemin, (0.0, hauteur))
+        if stats["groupes"] == 0 and stats["chemins"] == 0 and stats["inverses"] == 0:
             self.error("Ordonnancement : rien à modifier, l'ordre est déjà correct.", "info")
         else:
-            self.error("Ordonnancement : {} calque(s)/groupe(s) et {} chemin(s) déplacé(s).".format(stats["groupes"], stats["chemins"]), "info")
+            self.error("Ordonnancement : {} calque(s)/groupe(s) et {} chemin(s) déplacé(s), {} chemin(s) inversé(s).\n"
+                       "Déplacements à vide : {:.0f} mm avant, {:.0f} mm après.".format(
+                           stats["groupes"], stats["chemins"], stats["inverses"], stats["mm_avant"], stats["mm_apres"]), "info")
     # <<< FIN EVOLUTION ordonnancement
+
+    # >>> EVOLUTION remplissage
+    def Remplissage(self):
+        stats = path2laser_fill.remplir(self.svg, self.options.fill_angle, self.options.fill_spot,
+                                        self.options.fill_spacing, self.options.fill_reduce, couleur_gravure)
+        messages = ["Remplissage : {} forme(s) remplie(s), {} chemin(s) créé(s).".format(stats["remplis"], stats["chemins"])]
+        if stats["couleur"]:
+            messages.append("{} forme(s) ignorée(s) : le fond n'est pas de la couleur de gravure.".format(stats["couleur"]))
+        if stats["vide"]:
+            messages.append("{} forme(s) trop fine(s) pour le remplissage choisi.".format(stats["vide"]))
+        if stats["non_gere"]:
+            messages.append("{} texte(s), clone(s) ou image(s) ignoré(s) : à convertir en chemin.".format(stats["non_gere"]))
+        if stats["limite"]:
+            messages.append("{} forme(s) non remplie(s) : trop de lignes, augmenter l'écartement.".format(stats["limite"]))
+        self.error("\n".join(messages), "info")
+    # <<< FIN EVOLUTION remplissage
 
 ################################################################################
 #
@@ -211,31 +248,6 @@ class Path2Laser(inkex.EffectExtension):
 #
 ################################################################################
     def path_to_gcode(self):
-
-        def point_to_point_d2(a, b):
-            return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
-
-        def sort_lines(lines):
-            if len(lines) == 0:
-                return []
-            lines = [[key] + lines[key] for key in range(len(lines))]
-            keys = [0]
-            end_point = lines[0][3:]
-            del lines[0]
-            while len(lines) > 0:
-                dist = [[point_to_point_d2(end_point, lines[i][1:3]), i] for i in range(len(lines))]
-                i = min(dist)[1]
-                keys.append(lines[i][0])
-                end_point = lines[i][3:]
-                del lines[i]
-            return keys
-    
-        def sort_curves(curves):
-            lines = []
-            for curve in curves:
-                lines += [curve[0][0][0] + curve[-1][-1][0]]
-            return sort_lines(lines)
-         
 
         if self.selected_paths == {} :
             paths = self.paths
@@ -355,12 +367,10 @@ class Path2Laser(inkex.EffectExtension):
                         self.draw_curve(subcurve, layer, PreviewGroups,name=curve[0][0])
 
                 #passage en ordonnancement direct
-                # >>> EVOLUTION ordonnancement : dans un même calque/groupe la gravure passe avant la découpe
-                # (le tri par proximité se fait séparément pour chaque outil, résultat inchangé si le calque n'a qu'un seul outil)
-                keys = []
-                for nom_outil in ("Laser Engraver", "Laser cutter"):
-                    indices = [i for i in range(len(curves)) if curves[i][0][1]["name"] == nom_outil]
-                    keys += [indices[k] for k in sort_curves([curves[i][1] for i in indices])]
+                # >>> EVOLUTION ordonnancement : l'ordre du document est respecté, plus de tri automatique (voir path2laser_order)
+                # dans un même calque/groupe la gravure passe avant la découpe, chacune dans l'ordre du document
+                keys = [i for i in range(len(curves)) if curves[i][0][1]["name"] == "Laser Engraver"]
+                keys += [i for i in range(len(curves)) if curves[i][0][1]["name"] == "Laser cutter"]
                 # <<< FIN EVOLUTION ordonnancement
                 for key in keys:
                     #attention ici on est sur un ensemble avec une profondeur de passe
@@ -908,6 +918,14 @@ def type_chemin(chemin):
     if canal_pur(couleur, COLOR_CHANNEL_CUT):
         return "cut"
     return None
+
+################################################################################
+#
+# Couleur de gravure pour le remplissage : reçoit un objet inkex.Color
+#
+################################################################################
+def couleur_gravure(couleur):
+    return canal_pur(couleur.to_rgba(), COLOR_CHANNEL_GRAV)
 
 ################################################################################
 #

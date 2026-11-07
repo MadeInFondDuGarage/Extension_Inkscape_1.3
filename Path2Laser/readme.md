@@ -1,4 +1,4 @@
-# Extensions Inkscape - Création Patron Cuir & Générateur Gcode Laser / Inkscape Extensions - Leathercraft & Laser G-Code
+# Extensions Inkscape - Générateur Gcode Laser / Inkscape Extensions - Leathercraft & Laser G-Code
 
 [🇫🇷 Version Française](#-français) | [🇬🇧 English Version](#-english)
 
@@ -25,6 +25,8 @@ Ce dépôt regroupe un ensemble de 3 extensions pour **Inkscape** dédiées à l
   * **Variation de puissance** : L’opacité du tracé (Canal Alpha / Stroke Opacity) fait varier la puissance du laser de 0% à 100%.
 * **Gestion des passes et de l'axe Z** :
   * Découpe multi-passes paramétrable avec incrément de profondeur Z à chaque passe.
+* **Remplissage par des hachures (`path2laser_fill`)** :
+  * Remplissage par des hachures sur le chemin fermé qui contiennent un fond de couleur bleu.
 * **Réordonnancement intelligent (`path2laser_order`)** :
   * Réordonne les calques et objets dans l'ordre optimal de fabrication : **Gravures (Bleu) d'abord**, puis **Découpes (Rouge) ensuite**.
 * **Prévisualisation & Export** :
@@ -68,6 +70,8 @@ This repository contains a suite of 3 **Inkscape** extensions dedicated to digit
   * **Power Modulation**: Stroke Opacity (Alpha Channel) scales laser power output from 0% to 100%.
 * **Multi-pass & Z-Axis Control**:
   * Configurable cutting passes with step-down Z-depth increments per pass.
+* **Filling with hatching (`path2laser_fill`)**:
+  * Filling with hatching on blue background closed path.
 * **Smart Order Optimization (`path2laser_order`)**:
   * Automatically reorganizes layers and elements so that **Engravings (Blue) execute first**, followed by **Cuts (Red)**.
 * **Preview & Export**:
