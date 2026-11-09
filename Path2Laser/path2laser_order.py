@@ -14,8 +14,9 @@
 # Étape 1 : ordre des calques/groupes entre eux (seuls les calques/groupes visibles et les chemins
 #           visibles de couleur reconnue sont pris en compte)
 #   - calque/groupe de gravure seule   : en premier dans le gcode
-#   - calque/groupe de découpe seule   : ensuite
-#   - calque/groupe qui mélange les 2  : en dernier dans le gcode (le plus en arrière plan dans Inkscape)
+#   - calque/groupe qui mélange les 2  : ensuite
+#   - calque/groupe de découpe seule   : en dernier dans le gcode (le plus en arrière plan dans Inkscape)
+#
 #
 # Étape 2 : parcours des chemins dans chaque calque/groupe, en suivant l'ordre du gcode
 #   - la gravure puis la découpe
@@ -37,8 +38,8 @@ import time
 from inkex import Group, PathElement
 
 ATTR_IGNORE = "Path2Laser"  # attribut des groupes créés par l'extension (orientation, aperçu)
-RANG = {"grav": 0, "cut": 1}  # ordre dans le gcode, la gravure avant la découpe
-RANG_MIXTE = 2  # un calque/groupe avec les 2 opérations passe après les autres
+RANG = {"grav": 0, "cut": 2}  # ordre dans le gcode, la gravure avant la découpe
+RANG_MIXTE = 1  # un calque/groupe avec les 2 opérations passe au milieu des autres
 TOLERANCE = 1e-6  # écart maxi pour considérer 2 points identiques (unités du document)
 DELAI_AMELIORATION = 5.0  # secondes maxi par calque/groupe et par outil pour l'amélioration 2-opt
 

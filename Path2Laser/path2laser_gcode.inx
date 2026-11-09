@@ -63,8 +63,8 @@
             Pour le GCode, les calques sont lus du plus en avant plan au plus en arrière plan (le haut de la liste des calques en premier).
             L'ordre appliqué est :
             1) les calques/groupes de gravure seule (bleu)
-            2) les calques/groupes de découpe seule (rouge)
-            3) les calques/groupes qui mélangent gravure et découpe, placés en dernier (le plus en arrière plan)
+            2) les calques/groupes qui mélangent gravure et découpe, (le plus en arrière plan)
+            3) les calques/groupes de découpe seule (rouge)
             </_param>
             <_param name="order_infos2" type="description" xml:space="preserve">
             Ensuite, dans chaque calque/groupe, les chemins sont réordonnés pour réduire les déplacements à vide du laser : gravure puis découpe, chacune avec le parcours le plus court.
